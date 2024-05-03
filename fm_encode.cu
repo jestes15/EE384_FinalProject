@@ -1,3 +1,4 @@
+#include <chrono>
 #include <complex>
 #include <cuda_runtime.h>
 #include <cufft.h>
@@ -8,6 +9,8 @@
 #include <vector>
 
 #include "helper_cuda.h"
+
+float total_time = 0;
 
 #ifndef CUFFT_CALL
 #define CUFFT_CALL(call)                                                                                               \
@@ -305,6 +308,11 @@ thrust::device_vector<float> encode(thrust::device_vector<float> signal, thrust:
     thrust::device_vector<float> cumsum_result(signal.size());
     thrust::device_vector<float> encoded_signal(signal.size());
 
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
+	cudaEventRecord(start);
     thrust::inclusive_scan(signal.begin(), signal.end(), cumsum_result.begin());
 
     dim3 block(block_size, block_size, 1);
@@ -316,6 +324,14 @@ thrust::device_vector<float> encode(thrust::device_vector<float> signal, thrust:
         thrust::raw_pointer_cast(encoded_signal.data()), thrust::raw_pointer_cast(time.data()),
         thrust::raw_pointer_cast(cumsum_result.data()), 2.0f * M_PI * carrier_frequency,
         2.0f * M_PI * frequency_deviation, encoded_signal.size());
+	
+	cudaEventRecord(stop);
+
+	cudaEventSynchronize(stop);
+
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start, stop);
+	total_time += milliseconds;
 
     return encoded_signal;
 }
@@ -350,14 +366,27 @@ thrust::device_vector<float> decode(thrust::device_vector<float> signal, thrust:
 
 int main()
 {
-    int sampling_frequency = 100, carrier_frequency = 20, frequency_deviation = 50;
+    int sampling_frequency = 500, carrier_frequency = 20, frequency_deviation = 50;
     float begin = 0.0f, end = 1.0f, f1 = 5.0f, f2 = 10.0f, f3 = 15.0f;
     thrust::device_vector<float> signal((end - begin) / (1.0f / (float)sampling_frequency) + 1);
     thrust::device_vector<float> time((end - begin) / (1.0f / (float)sampling_frequency) + 1);
 
     generate_signal(signal, time, begin, end, sampling_frequency, f1, f2, f3);
+
+    auto start = std::chrono::high_resolution_clock::now();
     thrust::device_vector<float> encoded_signal =
         encode(signal, time, sampling_frequency, carrier_frequency, frequency_deviation);
+    auto stop = std::chrono::high_resolution_clock::now();
+
+	total_time = 0;
+
+    std::cout << "Time taken to encode under cold start: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()
+              << " us" << std::endl;
+
+	for (int i = 0; i < 100; i++) {
+        thrust::device_vector<float> encoded_signal =
+            encode(signal, time, sampling_frequency, carrier_frequency, frequency_deviation);
+    }
 
     std::vector<float> signal_host(signal.size());
     std::vector<float> time_host(time.size());
@@ -367,17 +396,15 @@ int main()
     thrust::copy(time.begin(), time.end(), time_host.begin());
     thrust::copy(encoded_signal.begin(), encoded_signal.end(), encoded_signal_host.begin());
 
-    for (int i = 0; i < (end - begin) / (1.0f / (float)sampling_frequency) + 1; i++)
-    {
-        printf("(%f, %f)\n", time_host[i], signal_host[i]);
-    }
+    std::cout << "Average time taken to encode: " << total_time / 100 * 1000 << " us" << std::endl;
 
-    matplot::plot(time_host, signal);
-    matplot::hold(matplot::on);
-    matplot::plot(time_host, encoded_signal);
-    matplot::hold(matplot::off);
+    // matplot::figure();
+    // matplot::plot(time_host, signal_host);
 
-    matplot::show();
+    // matplot::figure();
+    // matplot::plot(time_host, encoded_signal_host);
+
+    // matplot::show();
 
     return 0;
 }

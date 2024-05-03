@@ -67,6 +67,7 @@
 		"string_view": "cpp",
 		"system_error": "cpp",
 		"__verbose_abort": "cpp",
-		"complex": "cpp"
+		"complex": "cpp",
+		"chrono": "cpp"
 	}
 }
