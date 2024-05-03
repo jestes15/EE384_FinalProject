@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 #include <iostream>
-#include <matplot/matplot.h>
+// #include <matplot/matplot.h>
 #include <thrust/device_vector.h>
 #include <thrust/scan.h>
 #include <vector>
