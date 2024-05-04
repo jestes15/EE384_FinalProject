@@ -414,13 +414,13 @@ int main()
 
         printf("%f Hz - Average time taken to encode: %f\n", sampling_frequency, total_time / 100 * 1000);
 
-        // matplot::figure();
-        // matplot::plot(time_host, signal_host);
+        matplot::figure();
+        matplot::plot(time_host, signal_host);
 
-        // matplot::figure();
-        // matplot::plot(time_host, encoded_signal_host);
+        matplot::figure();
+        matplot::plot(time_host, encoded_signal_host);
 
-        // matplot::show();
+        matplot::show();
     }
 
     return 0;
