@@ -131,81 +131,44 @@ __global__ void fill_vector(float *output_signal, float *time, int size, float f
     }
 }
 
-__global__ void element_wise_multiplication(float *output, float *input1, float *input2, int size)
+__global__ void generate_encoded_signal(float *__restrict__ output, const float *const time,
+                                        const float *const cumulative_sum, const float time_constant,
+                                        const float cumulative_sum_constant, const unsigned int size,
+                                        const float sampling_frequency)
 {
-    int32_t threadIdx_x = threadIdx.x;
-    int32_t threadIdx_y = threadIdx.y;
+    const unsigned int block_x = blockDim.x;
+    const unsigned int block_y = blockDim.y;
 
-    int32_t idx = blockDim.x * blockIdx.x + threadIdx_x;
-    int32_t idy = blockDim.y * blockIdx.y + threadIdx_y;
+    unsigned int idx = block_x * blockIdx.x + threadIdx.x;
+    unsigned int idy = block_y * blockIdx.y + threadIdx.y;
+    const unsigned int local_size = size;
 
-    int32_t stride_x = blockDim.x * gridDim.x;
-    int32_t stride_y = blockDim.y * gridDim.y;
+    const unsigned int stride_x = block_x * gridDim.x;
+    const unsigned int stride_y = block_y * gridDim.y;
 
-    for (int j = idy; j < (size >> 1); j += stride_y)
+    while (idy < local_size)
     {
-        for (int i = idx; i < (size >> 1); i += stride_x)
+        while (idx < local_size)
         {
-            int index = j * block_size + i;
-            if (index < size)
+            const unsigned int index = idy * block_size + idx;
+
+            if (index < local_size)
             {
-                output[index] = input1[index] * input2[index];
+                const float temp1 = time[index];
+                const float temp2 = cumulative_sum[index];
+
+                float cos_temp1_temp, sin_temp1_temp;
+                float cos_temp2_temp, sin_temp2_temp;
+
+                __sincosf(temp1 * time_constant, &sin_temp1_temp, &cos_temp1_temp);
+                __sincosf(temp2 / sampling_frequency * cumulative_sum_constant, &sin_temp2_temp, &cos_temp2_temp);
+
+                output[index] = cos_temp1_temp * cos_temp2_temp - sin_temp1_temp * sin_temp2_temp;
             }
+
+            idx += stride_x;
         }
-    }
-}
-
-__global__ void element_wise_division(float *output, float scalar, int size)
-{
-    int32_t threadIdx_x = threadIdx.x;
-    int32_t threadIdx_y = threadIdx.y;
-
-    int32_t idx = blockDim.x * blockIdx.x + threadIdx_x;
-    int32_t idy = blockDim.y * blockIdx.y + threadIdx_y;
-
-    int32_t stride_x = blockDim.x * gridDim.x;
-    int32_t stride_y = blockDim.y * gridDim.y;
-
-    for (int j = idy; j < (size >> 1); j += stride_y)
-    {
-        for (int i = idx; i < (size >> 1); i += stride_x)
-        {
-            int index = j * block_size + i;
-            if (index < size)
-            {
-                output[index] = output[index] / scalar;
-            }
-        }
-    }
-}
-
-__global__ void generate_encoded_signal(float *output, float *time, float *cumsum, float time_constant,
-                                        float cumsum_constant, int size, float sampling_frequency)
-{
-    int32_t threadIdx_x = threadIdx.x;
-    int32_t threadIdx_y = threadIdx.y;
-
-    int32_t idx = blockDim.x * blockIdx.x + threadIdx_x;
-    int32_t idy = blockDim.y * blockIdx.y + threadIdx_y;
-
-    int32_t stride_x = blockDim.x * gridDim.x;
-    int32_t stride_y = blockDim.y * gridDim.y;
-
-    uint32_t bound = size >> 1;
-
-    for (; idy < bound; idy += stride_y)
-    {
-        for (; idx < bound; idx += stride_x)
-        {
-            int index = idy * block_size + idx;
-
-            if (index < size)
-            {
-                float int_x = cumsum[index] / sampling_frequency;
-                output[index] = __cosf(time_constant * time[index]) * __cosf(cumsum_constant * int_x) -
-                                __sinf(time_constant * time[index]) * __sinf(cumsum_constant * int_x);
-            }
-        }
+        idy += stride_y;
     }
 }
 
@@ -267,17 +230,21 @@ __global__ void yq_computation(cufftComplex *output, cufftComplex *hilbert_trans
     int32_t stride_x = blockDim.x * gridDim.x;
     int32_t stride_y = blockDim.y * gridDim.y;
 
-    for (int j = idy; j < (size >> 1); j += stride_y)
+    int corrected_size = size >> 1;
+
+    for (; idy < corrected_size; idy += stride_y)
     {
-        for (int i = idx; i < (size >> 1); i += stride_x)
+        for (; idx < corrected_size; idx += stride_x)
         {
-            int index = j * block_size + i;
+            int index = idy * block_size + idx;
+
             if (index < size)
             {
-                output[index].x = hilbert_transform_data[index].x * __cosf(exp_const * time[index]) +
-                                  hilbert_transform_data[index].y * __sinf(exp_const * time[index]);
-                output[index].y = hilbert_transform_data[index].y * __cosf(exp_const * time[index]) -
-                                  hilbert_transform_data[index].x * __sinf(exp_const * time[index]);
+                cufftComplex temp = hilbert_transform_data[index];
+                float temp_time = time[index];
+
+                output[index].x = temp.x * __cosf(exp_const * temp_time) + temp.y * __sinf(exp_const * temp_time);
+                output[index].y = temp.y * __cosf(exp_const * temp_time) - temp.x * __sinf(exp_const * temp_time);
             }
         }
     }
@@ -371,8 +338,14 @@ thrust::device_vector<float> decode(thrust::device_vector<float> signal, thrust:
 
 int main()
 {
+#ifndef NSYS_COMP
     int frequencies = 10;
-    float sampling_frequencies[frequencies] = {1000, 2000, 3000, 4000, 5000, 10000, 20000, 25000, 30000, 35000};
+    float sampling_frequencies[frequencies] = {1000.0f,  2000.0f,  3000.0f,  4000.0f,  5000.0f,
+                                               10000.0f, 20000.0f, 25000.0f, 30000.0f, 35000.0f};
+#else
+    int frequencies = 1;
+    float sampling_frequencies[frequencies] = {1000.0f};
+#endif
 
     for (int i = 0; i < frequencies; i++)
     {
@@ -383,22 +356,21 @@ int main()
         int carrier_frequency = 200, frequency_deviation = 50;
         float begin = 0.0f, end = 1.0f, f1 = 5.0f, f2 = 10.0f, f3 = 15.0f;
         float amplitude1 = 1.0f, amplitude2 = 2.0f, amplitude3 = 1.0f;
-        thrust::device_vector<float> signal((end - begin) / (1.0f / (float)sampling_frequency) + 1);
-        thrust::device_vector<float> time((end - begin) / (1.0f / (float)sampling_frequency) + 1);
+
+        thrust::device_vector<float> signal((end - begin) / (1.0f / sampling_frequency) + 1);
+        thrust::device_vector<float> time((end - begin) / (1.0f / sampling_frequency) + 1);
 
         generate_signal(signal, time, begin, end, sampling_frequency, f1, f2, f3, amplitude1, amplitude2, amplitude3);
-
-        auto start = std::chrono::high_resolution_clock::now();
         thrust::device_vector<float> encoded_signal =
             encode(signal, time, sampling_frequency, carrier_frequency, frequency_deviation);
-        auto stop = std::chrono::high_resolution_clock::now();
 
         total_time = 0;
 
-        std::cout << "Time taken to encode under cold start: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() << " us" << std::endl;
-
+#ifndef NSYS_COMP
         for (int i = 0; i < 100; i++)
+#else
+        for (int i = 0; i < 1; i++)
+#endif
         {
             thrust::device_vector<float> encoded_signal =
                 encode(signal, time, sampling_frequency, carrier_frequency, frequency_deviation);
@@ -414,13 +386,13 @@ int main()
 
         printf("%f Hz - Average time taken to encode: %f\n", sampling_frequency, total_time / 100 * 1000);
 
-        matplot::figure();
-        matplot::plot(time_host, signal_host);
+        // matplot::figure();
+        // matplot::plot(time_host, signal_host);
 
-        matplot::figure();
-        matplot::plot(time_host, encoded_signal_host);
+        // matplot::figure();
+        // matplot::plot(time_host, encoded_signal_host);
 
-        matplot::show();
+        // matplot::show();
     }
 
     return 0;
