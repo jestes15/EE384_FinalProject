@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 #include <iostream>
-#include <matplot/matplot.h>
+// #include <matplot/matplot.h>
 #include <thrust/device_vector.h>
 #include <thrust/scan.h>
 #include <vector>
@@ -139,9 +139,10 @@ __global__ void generate_encoded_signal(float *__restrict__ output, const float 
     const unsigned int block_x = blockDim.x;
     const unsigned int block_y = blockDim.y;
 
+    const unsigned int local_size = size;
+
     unsigned int idx = block_x * blockIdx.x + threadIdx.x;
     unsigned int idy = block_y * blockIdx.y + threadIdx.y;
-    const unsigned int local_size = size;
 
     const unsigned int stride_x = block_x * gridDim.x;
     const unsigned int stride_y = block_y * gridDim.y;
@@ -152,7 +153,7 @@ __global__ void generate_encoded_signal(float *__restrict__ output, const float 
         {
             const unsigned int index = idy * block_size + idx;
 
-            if (index < local_size)
+            if (index < size << 1)
             {
                 const float temp1 = time[index];
                 const float temp2 = cumulative_sum[index];
@@ -295,7 +296,7 @@ thrust::device_vector<float> encode(thrust::device_vector<float> signal, thrust:
     generate_encoded_signal<<<grid, block>>>(
         thrust::raw_pointer_cast(encoded_signal.data()), thrust::raw_pointer_cast(time.data()),
         thrust::raw_pointer_cast(cumsum_result.data()), 2.0f * M_PI * carrier_frequency,
-        2.0f * M_PI * frequency_deviation, encoded_signal.size(), sampling_frequency);
+        2.0f * M_PI * frequency_deviation, encoded_signal.size() / 2, sampling_frequency);
 
     cudaEventRecord(stop);
 
@@ -384,7 +385,7 @@ int main()
         thrust::copy(time.begin(), time.end(), time_host.begin());
         thrust::copy(encoded_signal.begin(), encoded_signal.end(), encoded_signal_host.begin());
 
-        printf("%f Hz - Average time taken to encode: %f\n", sampling_frequency, total_time / 100 * 1000);
+        printf("%f Hz - Average time taken to encode: %f us\n", sampling_frequency, total_time / 100 * 1000);
 
         // matplot::figure();
         // matplot::plot(time_host, signal_host);
