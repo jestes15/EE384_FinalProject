@@ -131,8 +131,8 @@ __global__ void fill_vector(float *output_signal, float *time, int size, float f
     }
 }
 
-__global__ void generate_encoded_signal(float *__restrict__ output, const float *const time,
-                                        const float *const cumulative_sum, const float time_constant,
+__global__ void generate_encoded_signal(float *__restrict__ output, const float *__restrict__ const time,
+                                        const float *__restrict__ const cumulative_sum, const float time_constant,
                                         const float cumulative_sum_constant, const unsigned int size,
                                         const float sampling_frequency)
 {
