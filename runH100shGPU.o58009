@@ -1,0 +1,65 @@
+setting asax scratch directory
+ 
+============================================================
+=====         Summary of your GPU job                  =====
+============================================================
+  The script file is: run_H100.sh
+  The time limit is 40:00:00 HH:MM:SS.
+  The target directory is: /home/uahclsd0002/EE384_FinalProject
+  The working directory is:  /scratch-local/uahclsd0002.runH100shGPU.58009.asax-pbs1
+  The memory limit is: 8gb
+  The job will start running after: 202405042100.44
+  Job Name: runH100shGPU
+  Virtual queue: -q class -W group_list=classq
+  Queue: -q class -W group_list=classq
+  Constraints: 
+  Using  8  cores on master node  asaxg001.asc.edu
+  Node list:  asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu asaxg001.asc.edu
+  Cores:  8
+  Command typed:
+/scripts/run_gpu run_H100.sh     
+  Queue submit command:
+qsub -q class -W group_list=classq -j oe -N runH100shGPU -a 202405042100.44 -r n -M jne0010@uah.edu -l walltime=40:00:00 -l select=1:gpuname=hopper:ngpus=1:ncpus=8:mpiprocs=8:mem=8000mb 
+ 
+Sat May  4 21:00:59 2024       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.129.03             Driver Version: 535.129.03   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA H100 PCIe               On  | 00000000:81:00.0 Off |                    0 |
+| N/A   26C    P0              46W / 310W |      4MiB / 81559MiB |      0%      Default |
+|                                         |                      |             Disabled |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+==PROF== Connected to process 2908859 (/home/uahclsd0002/EE384_FinalProject/fm_encode)
+==PROF== Profiling "_kernel_agent" - 0: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 1: 0%....50%....100% - 37 passes
+==PROF== Profiling "linspace" - 2: 0%....50%....100% - 37 passes
+==PROF== Profiling "fill_vector" - 3: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 4: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 5: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 6: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 7: 0%....50%....100% - 37 passes
+==PROF== Profiling "DeviceScanInitKernel" - 8: 0%....50%....100% - 37 passes
+==PROF== Profiling "DeviceScanKernel" - 9: 0%....50%....100% - 37 passes
+==PROF== Profiling "generate_encoded_signal" - 10: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 11: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 12: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 13: 0%....50%....100% - 37 passes
+==PROF== Profiling "_kernel_agent" - 14: 0%....50%....100% - 37 passes
+==PROF== Profiling "DeviceScanInitKernel" - 15: 0%....50%....100% - 37 passes
+==PROF== Profiling "DeviceScanKernel" - 16: 0%....50%....100% - 37 passes
+==PROF== Profiling "generate_encoded_signal" - 17: 0%....50%....100% - 37 passes
+1000.000000 Hz - Average time taken to encode: 0.000000 us
+==PROF== Disconnected from process 2908859
+==PROF== Report: /home/uahclsd0002/EE384_FinalProject/profile_output.ncu-rep
