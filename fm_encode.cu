@@ -152,6 +152,7 @@ __global__ void generate_encoded_signal(float *__restrict__ output, const float 
         while (idx < local_size)
         {
             const unsigned int index = idy * block_size + idx;
+            idx += stride_x;
 
             if (index < size << 1)
             {
@@ -166,8 +167,6 @@ __global__ void generate_encoded_signal(float *__restrict__ output, const float 
 
                 output[index] = cos_temp1_temp * cos_temp2_temp - sin_temp1_temp * sin_temp2_temp;
             }
-
-            idx += stride_x;
         }
         idy += stride_y;
     }
@@ -283,21 +282,23 @@ thrust::device_vector<float> encode(thrust::device_vector<float> signal, thrust:
 {
     thrust::device_vector<float> cumsum_result(signal.size());
     thrust::device_vector<float> encoded_signal(signal.size());
+    dim3 block(block_size, block_size, 1);
+    dim3 grid(((signal.size() / 2) + block.x - 1) / block.x, ((signal.size() / 2) + block.y - 1) / block.y);
 
+#ifndef NSYS_COMP
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
-
     cudaEventRecord(start);
-    thrust::inclusive_scan(signal.begin(), signal.end(), cumsum_result.begin());
+#endif
 
-    dim3 block(block_size, block_size, 1);
-    dim3 grid(((signal.size() / 2) + block.x - 1) / block.x, ((signal.size() / 2) + block.y - 1) / block.y);
+    thrust::inclusive_scan(signal.begin(), signal.end(), cumsum_result.begin());
     generate_encoded_signal<<<grid, block>>>(
         thrust::raw_pointer_cast(encoded_signal.data()), thrust::raw_pointer_cast(time.data()),
         thrust::raw_pointer_cast(cumsum_result.data()), 2.0f * M_PI * carrier_frequency,
-        2.0f * M_PI * frequency_deviation, encoded_signal.size() / 2, sampling_frequency);
+        2.0f * M_PI * frequency_deviation, encoded_signal.size() >> 1, sampling_frequency);
 
+#ifndef NSYS_COMP
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
@@ -305,7 +306,7 @@ thrust::device_vector<float> encode(thrust::device_vector<float> signal, thrust:
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
     total_time += milliseconds;
-
+#endif
     return encoded_signal;
 }
 
