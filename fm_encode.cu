@@ -346,7 +346,7 @@ int main()
                                                10000.0f, 20000.0f, 25000.0f, 30000.0f, 35000.0f};
 #else
     int frequencies = 1;
-    float sampling_frequencies[frequencies] = {1000.0f};
+    float sampling_frequencies[frequencies] = {35000.0f};
 #endif
 
     for (int i = 0; i < frequencies; i++)
