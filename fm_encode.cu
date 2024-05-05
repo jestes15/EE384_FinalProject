@@ -386,7 +386,11 @@ int main()
         thrust::copy(time.begin(), time.end(), time_host.begin());
         thrust::copy(encoded_signal.begin(), encoded_signal.end(), encoded_signal_host.begin());
 
+#ifndef NSYS_COMP
         printf("%f Hz - Average time taken to encode: %f us\n", sampling_frequency, total_time / 100 * 1000);
+#else
+        printf("%f Hz - Average time taken to encode: %f us\n", sampling_frequency, total_time * 1000);
+#endif
 
         // matplot::figure();
         // matplot::plot(time_host, signal_host);
